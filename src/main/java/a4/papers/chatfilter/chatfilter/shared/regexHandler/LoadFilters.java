@@ -68,6 +68,8 @@ public class LoadFilters {
     }
 
     public void loadUnicodeFilter() {
+        chatFilter.unicodeWhitelist.clear();
+        chatFilter.unicodeBlacklist.clear();
         loadUnicodeWhitelist();
         for (String key : chatFilter.getUnicodeConfig().getConfigurationSection("Unicode.blacklist").getKeys(false)) {
             ConfigurationSection word = chatFilter.getUnicodeConfig().getConfigurationSection("Unicode.blacklist." + key);
