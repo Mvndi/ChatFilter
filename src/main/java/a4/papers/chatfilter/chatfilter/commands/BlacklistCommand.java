@@ -153,12 +153,16 @@ public class BlacklistCommand implements CommandExecutor {
                     sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_IP_ARG.s)));
                     return true;
                 } else if (args[2].equals("word") && args.length > 3) {
-                    String argsString = String.join(" ", args).toLowerCase().replace("blacklist add word ", "");
-                    if (matchStringAdd(argsString)) {
-                        sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_WORD_NO.s).replace("%word%", argsString)));
+                    ParsedWordAdd parsedWordAdd = parseWordAdd(args);
+                    if (parsedWordAdd == null || parsedWordAdd.word.isEmpty()) {
+                        sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_WORD_ARG.s)));
+                        return true;
+                    }
+                    if (matchStringAdd(parsedWordAdd.word)) {
+                        sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_WORD_NO.s).replace("%word%", parsedWordAdd.word)));
                     } else {
-                        sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_WORD_ADDED.s).replace("%word%", argsString)));
-                        chatFilter.getFilters().createWordFilter(argsString, sender.getName());
+                        sender.sendMessage(chatFilter.colour(chatFilter.getLang().mapToString(EnumStrings.CMD_BLACKLIST_ADD_WORD_ADDED.s).replace("%word%", parsedWordAdd.word)));
+                        chatFilter.getFilters().createWordFilter(parsedWordAdd.word, sender.getName(), parsedWordAdd.importAsWord);
                     }
                 } else if (args[2].equals("ip") && args.length > 3) {
                     String argsString = String.join(" ", args).toLowerCase().replaceAll("blacklist add ip ", "");
@@ -182,6 +186,44 @@ public class BlacklistCommand implements CommandExecutor {
             }
         }
         return false;
+    }
+
+    private ParsedWordAdd parseWordAdd(String[] args) {
+        List<String> parts = new ArrayList<>();
+        Collections.addAll(parts, args);
+        if (parts.size() <= 3) {
+            return null;
+        }
+
+        List<String> wordParts = new ArrayList<>(parts.subList(3, parts.size()));
+        boolean importAsWord = true;
+
+        if (wordParts.size() > 1) {
+            String mode = wordParts.get(wordParts.size() - 1).toLowerCase();
+            if (mode.equals("word")) {
+                wordParts.remove(wordParts.size() - 1);
+            } else if (mode.equals("regex")) {
+                wordParts.remove(wordParts.size() - 1);
+                importAsWord = false;
+            }
+        }
+
+        String word = String.join(" ", wordParts).trim().toLowerCase();
+        if (word.isEmpty()) {
+            return null;
+        }
+
+        return new ParsedWordAdd(word, importAsWord);
+    }
+
+    private static final class ParsedWordAdd {
+        private final String word;
+        private final boolean importAsWord;
+
+        private ParsedWordAdd(String word, boolean importAsWord) {
+            this.word = word;
+            this.importAsWord = importAsWord;
+        }
     }
 
 }

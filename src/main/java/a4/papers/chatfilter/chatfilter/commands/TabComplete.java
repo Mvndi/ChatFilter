@@ -41,6 +41,14 @@ public class TabComplete implements TabCompleter {
             arguments3.add("word");
             arguments3.add("ip");
             return arguments3;
+        } else if (args.length >= 5
+                && args[0].equalsIgnoreCase("blacklist")
+                && args[1].equalsIgnoreCase("add")
+                && args[2].equalsIgnoreCase("word")) {
+            List<String> arguments4 = new ArrayList<>();
+            arguments4.add("word");
+            arguments4.add("regex");
+            return arguments4;
         }
         return Collections.emptyList();
     }

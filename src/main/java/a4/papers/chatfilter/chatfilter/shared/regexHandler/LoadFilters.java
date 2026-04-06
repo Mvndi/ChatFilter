@@ -2,6 +2,7 @@ package a4.papers.chatfilter.chatfilter.shared.regexHandler;
 
 import a4.papers.chatfilter.chatfilter.ChatFilter;
 import a4.papers.chatfilter.chatfilter.shared.FilterWrapper;
+import a4.papers.chatfilter.chatfilter.shared.Normalizer;
 import a4.papers.chatfilter.chatfilter.shared.UnicodeWrapper;
 import org.bukkit.configuration.ConfigurationSection;
 
@@ -11,6 +12,7 @@ import java.util.regex.Pattern;
 
 public class LoadFilters {
 
+    private final Normalizer normalizer = new Normalizer();
     ChatFilter chatFilter;
 
     public LoadFilters(ChatFilter instance) {
@@ -122,10 +124,16 @@ public class LoadFilters {
     }
 
     public void createWordFilter(String word, String sender) {
+        createWordFilter(word, sender, true);
+    }
+
+    public void createWordFilter(String word, String sender, boolean importAsWord) {
         String regex = chatFilter.regexpGenerator().generateRegexp(word);
         if (chatFilter.perWordOptionsEnable) {
             chatFilter.getWordConfig().set("ChatFilter." + word + ".Enabled", chatFilter.defaultWordEnabled);
-            chatFilter.getWordConfig().set("ChatFilter." + word + ".Word", word);
+            if (importAsWord) {
+                chatFilter.getWordConfig().set("ChatFilter." + word + ".Word", word);
+            }
             chatFilter.getWordConfig().set("ChatFilter." + word + ".Regex", regex);
             chatFilter.getWordConfig().set("ChatFilter." + word + ".Warn.Staff", chatFilter.defaultWordWarnStaff);
             chatFilter.getWordConfig().set("ChatFilter." + word + ".Warn.Player", chatFilter.defaultWordWarnPlayer);
@@ -140,7 +148,9 @@ public class LoadFilters {
             if (key == null) {
                 chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString, "");
                 chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Enabled", chatFilter.defaultWordEnabled);
-                chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Word", word);
+                if (importAsWord) {
+                    chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Word", word);
+                }
                 chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Regex", regex);
                 chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Warn.Staff", chatFilter.defaultWordWarnStaff);
                 chatFilter.getWordConfig().set("ChatFilter." + chatFilter.perWordOptionsString + ".Warn.Player", chatFilter.defaultWordWarnPlayer);
@@ -203,6 +213,9 @@ public class LoadFilters {
 
     private void registerCanonicalWords(List<String> canonicalWords, FilterWrapper filterWrapper) {
         for (String canonicalWord : canonicalWords) {
+            if (!shouldRegisterCanonicalWord(canonicalWord)) {
+                continue;
+            }
             chatFilter.swearWordRegistry.register(canonicalWord, filterWrapper);
         }
     }
@@ -223,5 +236,38 @@ public class LoadFilters {
         }
 
         return words;
+    }
+
+    private boolean shouldRegisterCanonicalWord(String canonicalWord) {
+        if (canonicalWord == null || canonicalWord.trim().isEmpty()) {
+            return false;
+        }
+
+        String normalizedWord = normalizer.normalize(canonicalWord);
+        if (normalizedWord.isEmpty()) {
+            return false;
+        }
+
+        String comparableSource = stripNonAlphanumeric(normalizedWord);
+        if (comparableSource.isEmpty()) {
+            return false;
+        }
+
+        if (comparableSource.length() > 4) {
+            return true;
+        }
+
+        return comparableSource.equals(normalizer.aggressiveNormalize(comparableSource));
+    }
+
+    private String stripNonAlphanumeric(String input) {
+        StringBuilder builder = new StringBuilder(input.length());
+        for (int index = 0; index < input.length(); index++) {
+            char current = input.charAt(index);
+            if (Character.isLetterOrDigit(current)) {
+                builder.append(current);
+            }
+        }
+        return builder.toString();
     }
 }
