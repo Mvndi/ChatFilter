@@ -1,7 +1,6 @@
 package a4.papers.chatfilter.chatfilter.shared;
 
 import a4.papers.chatfilter.chatfilter.ChatFilter;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -9,15 +8,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ChatFilters {
-
     ChatFilter chatFilter;
+    private final Normalizer normalizer = new Normalizer();
+    private final SwearFilterEngine swearFilterEngine = new SwearFilterEngine();
 
     public ChatFilters(ChatFilter instance) {
         chatFilter = instance;
     }
 
     private String removeBypass(String s) {
-        List<String> bypassItems = new ArrayList<String>(chatFilter.byPassWords);
+        List<String> bypassItems = new ArrayList<>(chatFilter.byPassWords);
         bypassItems.addAll(chatFilter.byPassDNS);
         for (String removewording : bypassItems) {
             if (s.contains(removewording)) {
@@ -35,20 +35,37 @@ public class ChatFilters {
         String regex = "";
         Map<String, FilterWrapper> regexMap = new HashMap<>();
         String lowercaseString = removeBypass(string.toLowerCase());
+        String normalizedString = removeBypass(normalizer.normalize(string));
         Types type = Types.NOTYPE;
-        List<String> groupWords = new ArrayList<String>();
-        List<String> regexUsed = new ArrayList<String>();
+        List<String> groupWords = new ArrayList<>();
+        List<String> regexUsed = new ArrayList<>();
         if (!(player.hasPermission("chatfilter.bypass.swear"))) {
+            for (String swearMatch : swearFilterEngine.findMatches(normalizedString, chatFilter.swearWordRegistry)) {
+                if (!player.hasPermission("chatfilter.bypass.swear." + swearMatch)) {
+                    matched = true;
+                }
+                matchedSwear = true;
+                FilterWrapper exactFilter = chatFilter.swearWordRegistry.getFilter(swearMatch);
+                if (exactFilter != null) {
+                    regex = exactFilter.getRegex();
+                    regexUsed.add(exactFilter.getRegex());
+                }
+                if (!groupWords.contains(swearMatch)) {
+                    groupWords.add(swearMatch);
+                }
+            }
+
             for (Pattern p : chatFilter.wordRegexPattern) {
-                Matcher m = p.matcher(lowercaseString);
+                Matcher m = p.matcher(normalizedString);
                 while (m.find()) {
-                    if (!player.hasPermission("chatfilter.bypass.swear." + m.group(0)))
+                    String matchedWord = m.group(0);
+                    if (!player.hasPermission("chatfilter.bypass.swear." + matchedWord))
                         matched = true;
                     matchedSwear = true;
                     regex = p.pattern();
                     regexUsed.add(p.pattern());
-                    if (!groupWords.contains(m.group(0))) {
-                        groupWords.add(m.group(0));
+                    if (!groupWords.contains(matchedWord)) {
+                        groupWords.add(matchedWord);
                     }
                 }
             }
@@ -83,7 +100,6 @@ public class ChatFilters {
         }
 
         if (matchedURL) {
-            matched = true;
             type = Types.URL;
         }
         if (isFont(string)) {
@@ -125,7 +141,11 @@ public class ChatFilters {
                     int cp = string.codePointAt(iLetter);
                     if (cp >= UrangeLow && cp <= UrangeHigh) {
                         matchedFont = true;
+                        break;
                     }
+                }
+                if (matchedFont) {
+                    break;
                 }
             }
         }

@@ -7,6 +7,7 @@ import a4.papers.chatfilter.chatfilter.commands.TabComplete;
 import a4.papers.chatfilter.chatfilter.events.*;
 import a4.papers.chatfilter.chatfilter.shared.ChatFilters;
 import a4.papers.chatfilter.chatfilter.shared.FilterWrapper;
+import a4.papers.chatfilter.chatfilter.shared.SwearWordRegistry;
 import a4.papers.chatfilter.chatfilter.shared.Types;
 import a4.papers.chatfilter.chatfilter.shared.UnicodeWrapper;
 import a4.papers.chatfilter.chatfilter.shared.lang.LangManager;
@@ -38,7 +39,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
+import java.util.Objects;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 public class ChatFilter extends JavaPlugin {
@@ -49,10 +51,9 @@ public class ChatFilter extends JavaPlugin {
     public CommandHandler commandHandler;
     public LangManager langManager;
     public LoadFilters loadFilters;
-    public FilterWrapper filterWrapper;
-    public UnicodeWrapper unicodeWrapper;
     public RegexpGenerator regexpGenerator;
     public Manager manager;
+    public SwearWordRegistry swearWordRegistry;
     public List<Pattern> wordRegexPattern = new ArrayList<>();
     public List<Pattern> advertRegexPattern = new ArrayList<>();
     public Map<String, FilterWrapper> regexWords;
@@ -130,16 +131,17 @@ public class ChatFilter extends JavaPlugin {
         loadFilters = new LoadFilters(this);
         regexpGenerator = new RegexpGenerator(this);
         manager = new Manager(this);
+        swearWordRegistry = new SwearWordRegistry();
         try {
             langManager.loadLang();
         } catch (MalformedURLException e) {
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Failed to load language resources", e);
         }
         createCustomConfig();
         loadVariables();
-        getCommand("chatfilter").setExecutor(new CommandMain(this));
-        getCommand("clearchat").setExecutor(new ClearChatCommand(this));
-        getCommand("chatfilter").setTabCompleter(new TabComplete());
+        Objects.requireNonNull(getCommand("chatfilter")).setExecutor(new CommandMain(this));
+        Objects.requireNonNull(getCommand("clearchat")).setExecutor(new ClearChatCommand(this));
+        Objects.requireNonNull(getCommand("chatfilter")).setTabCompleter(new TabComplete());
         PluginManager pm = getServer().getPluginManager();
         SwearChatListener scl = new SwearChatListener(this);
         CapsChatListener ccl = new CapsChatListener(this);
@@ -230,7 +232,7 @@ public class ChatFilter extends JavaPlugin {
 
     public String colour(String s) {
         if (manager.supported("hex")) {
-            return manager.colorStringHex(s);
+            return Manager.colorStringHex(s);
         } else {
             return ChatColor.translateAlternateColorCodes('&', s);
         }
@@ -296,19 +298,19 @@ public class ChatFilter extends JavaPlugin {
         unicodeConfigFile = new File(getDataFolder(), "unicodeFilters.yml");
 
         if (!whitelistConfigFile.exists()) {
-            whitelistConfigFile.getParentFile().mkdirs();
+            ensureParentDirectoryExists(whitelistConfigFile);
             saveResource("whitelisted.yml", false);
         }
         if (!wordConfigFile.exists()) {
-            wordConfigFile.getParentFile().mkdirs();
+            ensureParentDirectoryExists(wordConfigFile);
             saveResource("wordFilters.yml", false);
         }
         if (!advertConfigFile.exists()) {
-            advertConfigFile.getParentFile().mkdirs();
+            ensureParentDirectoryExists(advertConfigFile);
             saveResource("advertFilters.yml", false);
         }
         if (!unicodeConfigFile.exists()) {
-            unicodeConfigFile.getParentFile().mkdirs();
+            ensureParentDirectoryExists(unicodeConfigFile);
             saveResource("unicodeFilters.yml", false);
         }
         whitelistConfig = new YamlConfiguration();
@@ -323,7 +325,14 @@ public class ChatFilter extends JavaPlugin {
             unicodeConfig.load(unicodeConfigFile);
 
         } catch (IOException | InvalidConfigurationException e) {
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Failed to load plugin configuration files", e);
+        }
+    }
+
+    private void ensureParentDirectoryExists(File file) {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            getLogger().warning("Failed to create directory " + parent.getAbsolutePath());
         }
     }
 
