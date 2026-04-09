@@ -47,6 +47,32 @@ public final class BoundaryChecker {
         return BoundaryResult.PASS;
     }
 
+    public BoundaryResult checkAffixOnly(String token, String bannedSubstring) {
+        if (isBlank(token) || isBlank(bannedSubstring)) {
+            return BoundaryResult.PASS;
+        }
+
+        int startIndex = token.indexOf(bannedSubstring);
+        while (startIndex >= 0) {
+            int endIndex = startIndex + bannedSubstring.length();
+            String prefix = token.substring(0, startIndex);
+            String suffix = token.substring(endIndex);
+
+            boolean prefixAffixMatch = endIndex == token.length()
+                    && (prefix.isEmpty() || COMMON_PREFIXES.contains(prefix));
+            boolean suffixAffixMatch = startIndex == 0
+                    && (suffix.isEmpty() || COMMON_SUFFIXES.contains(suffix));
+
+            if (prefixAffixMatch || suffixAffixMatch) {
+                return BoundaryResult.FLAG;
+            }
+
+            startIndex = token.indexOf(bannedSubstring, startIndex + 1);
+        }
+
+        return BoundaryResult.PASS;
+    }
+
     private boolean isBlank(String input) {
         return input == null || input.trim().isEmpty();
     }

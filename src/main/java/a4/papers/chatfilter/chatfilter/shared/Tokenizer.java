@@ -15,19 +15,26 @@ public final class Tokenizer {
         }
 
         List<String> tokens = new ArrayList<>();
+        List<List<String>> tokenGroups = new ArrayList<>();
 
         for (String whitespaceToken : WHITESPACE_PATTERN.split(normalizedInput.trim())) {
             if (whitespaceToken.isEmpty()) {
                 continue;
             }
 
+            List<String> group = new ArrayList<>();
             for (String punctuationToken : PUNCTUATION_PATTERN.split(whitespaceToken)) {
                 if (!punctuationToken.isEmpty()) {
                     tokens.add(punctuationToken);
+                    group.add(punctuationToken);
                 }
+            }
+
+            if (!group.isEmpty()) {
+                tokenGroups.add(group);
             }
         }
 
-        return new TokenizeResult(Collections.unmodifiableList(tokens));
+        return new TokenizeResult(Collections.unmodifiableList(tokens), tokenGroups);
     }
 }

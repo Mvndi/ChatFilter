@@ -23,7 +23,8 @@ public final class SwearFilterEngine {
         LinkedHashSet<String> matches = new LinkedHashSet<>();
 
         addExactTokenMatches(matches, tokenizeResult.normalTokens(), swearWordRegistry);
-        addControlledSplitMatches(matches, tokenizeResult.normalTokens(), swearWordRegistry);
+        addControlledSplitExactMatches(matches, tokenizeResult.normalTokens(), swearWordRegistry);
+        addControlledSplitMatches(matches, tokenizeResult.tokenGroups(), swearWordRegistry);
         addSingleTokenSubstringMatches(matches, tokenizeResult.normalTokens(), swearWordRegistry);
 
         return new ArrayList<>(matches);
@@ -40,7 +41,54 @@ public final class SwearFilterEngine {
         }
     }
 
-    private void addControlledSplitMatches(Set<String> matches, List<String> tokens, SwearWordRegistry swearWordRegistry) {
+    private void addControlledSplitMatches(Set<String> matches, List<List<String>> tokenGroups, SwearWordRegistry swearWordRegistry) {
+        if (tokenGroups == null || tokenGroups.isEmpty()) {
+            return;
+        }
+
+        int maxLength = swearWordRegistry.getMaxComparableWordLength();
+        if (maxLength <= 0) {
+            return;
+        }
+
+        for (List<String> tokens : tokenGroups) {
+            for (int start = 0; start < tokens.size(); start++) {
+                StringBuilder builder = new StringBuilder();
+                boolean hasShortFragment = false;
+
+                for (int end = start; end < tokens.size() && end < start + MAX_SPLIT_WINDOW_TOKENS; end++) {
+                    String token = tokens.get(end);
+                    builder.append(token);
+                    if (builder.length() > maxLength + 4) {
+                        break;
+                    }
+
+                    if (token.length() <= MAX_SHORT_FRAGMENT_LENGTH) {
+                        hasShortFragment = true;
+                    }
+
+                    if (end == start || !hasShortFragment) {
+                        continue;
+                    }
+
+                    String candidate = builder.toString();
+                    addExactComparableMatch(matches, candidate, swearWordRegistry);
+
+                    String squeezedCandidate = normalizer.squeezeRepeats(candidate);
+                    if (!squeezedCandidate.equals(candidate)) {
+                        addExactComparableMatch(matches, squeezedCandidate, swearWordRegistry);
+                    }
+
+                    addBoundarySubstringMatch(matches, candidate, swearWordRegistry);
+                    if (!squeezedCandidate.equals(candidate)) {
+                        addBoundarySubstringMatch(matches, squeezedCandidate, swearWordRegistry);
+                    }
+                }
+            }
+        }
+    }
+
+    private void addControlledSplitExactMatches(Set<String> matches, List<String> tokens, SwearWordRegistry swearWordRegistry) {
         if (tokens == null || tokens.isEmpty()) {
             return;
         }
@@ -71,15 +119,12 @@ public final class SwearFilterEngine {
 
                 String candidate = builder.toString();
                 addExactComparableMatch(matches, candidate, swearWordRegistry);
+                addSplitAffixMatch(matches, candidate, swearWordRegistry);
 
                 String squeezedCandidate = normalizer.squeezeRepeats(candidate);
                 if (!squeezedCandidate.equals(candidate)) {
                     addExactComparableMatch(matches, squeezedCandidate, swearWordRegistry);
-                }
-
-                addBoundarySubstringMatch(matches, candidate, swearWordRegistry);
-                if (!squeezedCandidate.equals(candidate)) {
-                    addBoundarySubstringMatch(matches, squeezedCandidate, swearWordRegistry);
+                    addSplitAffixMatch(matches, squeezedCandidate, swearWordRegistry);
                 }
             }
         }
@@ -117,6 +162,25 @@ public final class SwearFilterEngine {
                 continue;
             }
             if (boundaryChecker.check(comparableToken, bannedWord) == BoundaryResult.FLAG) {
+                matches.add(bannedWord);
+            }
+        }
+    }
+
+    private void addSplitAffixMatch(Set<String> matches, String token, SwearWordRegistry swearWordRegistry) {
+        String comparableToken = swearWordRegistry.toComparableToken(token);
+        if (comparableToken.isEmpty()) {
+            return;
+        }
+
+        for (String bannedWord : swearWordRegistry.getExactMatchSet()) {
+            if (comparableToken.length() <= bannedWord.length()) {
+                continue;
+            }
+            if (!comparableToken.contains(bannedWord)) {
+                continue;
+            }
+            if (boundaryChecker.checkAffixOnly(comparableToken, bannedWord) == BoundaryResult.FLAG) {
                 matches.add(bannedWord);
             }
         }
