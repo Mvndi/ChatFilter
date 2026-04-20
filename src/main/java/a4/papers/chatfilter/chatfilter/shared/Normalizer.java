@@ -27,12 +27,42 @@ public final class Normalizer {
             return "";
         }
 
+        boolean hasMixedContentWithNumbers = hasMixedLettersAndNumbersOrSymbols(input);
+
         String normalized = stripZeroWidthCharacters(input);
         normalized = stripFormattingCodes(normalized);
         normalized = mapCharacters(normalized, HOMOGLYPH_MAP);
-        normalized = mapCharacters(normalized, LEET_MAP);
+        
+        if (hasMixedContentWithNumbers) {
+            normalized = mapCharacters(normalized, LEET_MAP);
+        }
+        
         normalized = collapseRepeats(normalized, 2);
         return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasMixedLettersAndNumbersOrSymbols(String input) {
+        if (input == null || input.isEmpty()) {
+            return false;
+        }
+        
+        boolean hasLetters = false;
+        boolean hasNumbersOrSymbols = false;
+        
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (Character.isLetter(c)) {
+                hasLetters = true;
+            } else if (Character.isDigit(c) || c == '@' || c == '$' || c == '!' || c == '+' || c == '|') {
+                hasNumbersOrSymbols = true;
+            }
+            
+            if (hasLetters && hasNumbersOrSymbols) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     public String aggressiveNormalize(String token) {
@@ -186,6 +216,7 @@ public final class Normalizer {
         map.put('7', 't');
         map.put('8', 'b');
         map.put('9', 'g');
+
         map.put('@', 'a');
         map.put('$', 's');
         map.put('!', 'i');
